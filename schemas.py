@@ -1,48 +1,57 @@
 """
-Database Schemas
+Database Schemas for Bill Printing App
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model corresponds to a MongoDB collection (lowercased class name).
 """
-
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
-from typing import Optional
 
-# Example schemas (replace with your own):
+class MenuItem(BaseModel):
+    name: str = Field(..., description="Item name")
+    category: str = Field(..., description="Category like Beverages, Mains, Desserts")
+    price: float = Field(..., ge=0, description="Base price (pre-tax)")
+    description: Optional[str] = Field(None, description="Short description")
+    is_available: bool = Field(True, description="Available to order")
+    gst_rate: float = Field(0.05, ge=0, le=0.28, description="GST rate fraction (e.g., 0.05 = 5%)")
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+class InventoryItem(BaseModel):
+    sku: str = Field(..., description="Unique SKU or code")
+    name: str = Field(..., description="Inventory item name")
+    quantity: float = Field(..., ge=0, description="Current stock level")
+    unit: str = Field("unit", description="Unit of measure")
+    low_stock_threshold: float = Field(0, ge=0, description="Alert threshold")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Customer(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    loyalty_points: int = Field(0, ge=0)
 
-# Add your own schemas here:
-# --------------------------------------------------
+class OrderItem(BaseModel):
+    menu_item_id: str = Field(..., description="Reference to MenuItem _id")
+    name: Optional[str] = Field(None, description="Snapshot of name for receipt")
+    price: Optional[float] = Field(None, description="Snapshot of unit price for receipt")
+    quantity: int = Field(..., ge=1)
+    notes: Optional[str] = None
+    gst_rate: Optional[float] = Field(None, description="Snapshot GST rate")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Payment(BaseModel):
+    method: Literal["cash","card","upi","wallet","split","other"] = "cash"
+    amount: float = Field(0, ge=0)
+    reference: Optional[str] = None
+
+class Order(BaseModel):
+    table_no: Optional[str] = Field(None, description="Table number or token")
+    customer_id: Optional[str] = None
+    status: Literal["pending","preparing","ready","served","cancelled"] = "pending"
+    items: List[OrderItem]
+    subtotal: float = 0
+    tax_total: float = 0
+    grand_total: float = 0
+    payments: List[Payment] = []
+    discount: float = 0
+    notes: Optional[str] = None
+
+class ReportFilter(BaseModel):
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
